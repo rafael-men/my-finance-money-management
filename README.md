@@ -3,12 +3,12 @@
 My Finance é um aplicativo Flutter para gerenciamento de despesas pessoais com armazenamento local usando Hive.
 
 ✨ Funcionalidades Principais
-✅ Adicionar e visualizar despesas diárias
-✅ Gráficos de gastos mensais
-✅ Limite de gastos com alertas
-✅ Filtro por dia da semana
-✅ Reinício automático no novo mês
-✅ Armazenamento local persistente
+- ✅ Adicionar e visualizar despesas diárias
+- ✅ Gráficos de gastos mensais
+- ✅ Limite de gastos com alertas
+- ✅ Filtro por dia da semana
+- ✅ Reinício automático no novo mês
+- ✅ Armazenamento local persistente
 
 🛠 Tecnologias Utilizadas
 - Flutter 3
