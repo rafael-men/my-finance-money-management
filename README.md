@@ -1,4 +1,4 @@
-📊 My Finance - Aplicativo de Gestão Financeira Pessoal
+# 📊 My Finance - Aplicativo de Gestão Financeira Pessoal
 
 My Finance é um aplicativo Flutter para gerenciamento de despesas pessoais com armazenamento local usando Hive.
 
