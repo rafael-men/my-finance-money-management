@@ -49,4 +49,4 @@ Push para a branch (git push origin feature/nova-funcionalidade)
 
 Abra um Pull Request
 
-Link do Projeto: https://github.com/rafael-men/my_finance
+Link do Projeto: https://github.com/rafael-men/my-finance-money-management
