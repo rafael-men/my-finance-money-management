@@ -6,14 +6,15 @@ My Finance é um aplicativo Flutter para gerenciamento de despesas pessoais com 
 - ✅ Adicionar e visualizar despesas diárias
 - ✅ Gráficos de gastos mensais
 - ✅ Limite de gastos com alertas
-- ✅ Filtro por dia da semana
-- ✅ Reinício automático no novo mês
+- ✅ Filtro por mês
 - ✅ Armazenamento local persistente
 
 🛠 Tecnologias Utilizadas
 - Flutter 3
 - Hive 2.2.3 
 - fl_chart 0.70.0
+- build_runner 2.4.7
+- hive_generator 2.0.1
 
 ## 📥 Instalação
 - Clone o repositório:
@@ -39,11 +40,12 @@ option chrome 2
 ```
 
 ## 🔄 Como Contribuir
-Faça um fork do projeto
 
-Crie sua branch (git checkout -b feature/nova-funcionalidade)
+Faça um fork do projeto.
 
-Commit suas mudanças (git commit -m 'Adiciona nova funcionalidade')
+Crie sua branch (git checkout -b feature/nova-funcionalidade).
+
+Commit suas mudanças (git commit -m 'Adiciona nova funcionalidade').
 
 Push para a branch (git push origin feature/nova-funcionalidade)
 
