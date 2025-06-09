@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../data/expense_data.dart';
 import '../models/expense_item.dart';
@@ -17,9 +18,8 @@ class _HomepageState extends State<Homepage> {
   ExpenseData? expenseData;
   final TextEditingController _limitController = TextEditingController();
   double spendingLimit = 0.0;
-  String selectedDay = '';
-  final List<String> weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
   bool isLoading = true;
+  late Box settingsBox;
 
   @override
   void initState() {
@@ -32,6 +32,14 @@ class _HomepageState extends State<Homepage> {
       expenseData = ExpenseData();
       await expenseData!.init();
       await expenseData!.prepareData();
+      
+     
+      settingsBox = await Hive.openBox('settings');
+      
+     
+      spendingLimit = settingsBox.get('spendingLimit', defaultValue: 0.0);
+      _limitController.text = spendingLimit > 0 ? spendingLimit.toString() : '';
+      
       setState(() {
         isLoading = false;
       });
@@ -58,35 +66,44 @@ class _HomepageState extends State<Homepage> {
     }
   }
 
+  
+  Future<void> _saveSpendingLimit(double limit) async {
+    await settingsBox.put('spendingLimit', limit);
+  }
+
   @override
   void dispose() {
     _limitController.dispose();
     expenseData?.close();
+    settingsBox.close();
     super.dispose();
   }
 
-  List<ExpenseItem> getFilteredExpenses() {
-    if (expenseData == null) return [];
+  
+  Map<String, double> getMonthlyExpenses() {
+    if (expenseData == null) return {};
     
-    if (selectedDay.isEmpty) {
-      return expenseData!.getAllExpenseList();
+    final now = DateTime.now();
+    final Map<String, double> monthlyTotals = {};
+    
+    
+    for (int i = 5; i >= 0; i--) {
+      final monthDate = DateTime(now.year, now.month - i, 1);
+      final monthKey = '${_shortMonthName(monthDate.month)}/${monthDate.year.toString().substring(2)}';
+      monthlyTotals[monthKey] = 0.0;
     }
     
-    // Mapear os dias em português para inglês que o ExpenseData usa
-    final dayMapping = {
-      'Dom': 'Sun',
-      'Seg': 'Mon', 
-      'Ter': 'Tue',
-      'Qua': 'Wed',
-      'Qui': 'Thu',
-      'Sex': 'Fri',
-      'Sab': 'Sat'
-    };
+   
+    for (var expense in expenseData!.getAllExpenseList()) {
+      final monthKey = '${_shortMonthName(expense.date.month)}/${expense.date.year.toString().substring(2)}';
+      
+      if (monthlyTotals.containsKey(monthKey)) {
+        monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + 
+                                 (double.tryParse(expense.amount) ?? 0);
+      }
+    }
     
-    final englishDay = dayMapping[selectedDay];
-    if (englishDay == null) return expenseData!.getAllExpenseList();
-    
-    return expenseData!.getExpensesForWeekday(englishDay);
+    return monthlyTotals;
   }
 
   double getTotalSpentCurrentMonth() {
@@ -109,35 +126,37 @@ class _HomepageState extends State<Homepage> {
     return months[month - 1];
   }
 
-  List<BarChartGroupData> _buildWeeklyBarGroups() {
-    if (expenseData == null) return [];
-    
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-    
-    // Mapear gastos por semana do mês
-    final Map<int, double> weeklyTotals = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0};
-    
-    for (var expense in expenseData!.getAllExpenseList()) {
-      if (expense.date.month == now.month && expense.date.year == now.year) {
-        final weekOfMonth = _getWeekOfMonth(expense.date, firstDayOfMonth);
-        weeklyTotals[weekOfMonth] = (weeklyTotals[weekOfMonth] ?? 0) + 
-                                   (double.tryParse(expense.amount) ?? 0);
-      }
-    }
+  String _shortMonthName(int month) {
+    const months = [
+      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+    ];
+    return months[month - 1];
+  }
 
-    final maxYValue = (weeklyTotals.values.isEmpty
-            ? 100.0
-            : weeklyTotals.values.reduce((a, b) => a > b ? a : b) * 1.2)
-        .clamp(100.0, double.infinity);
+  String _getDayNameInPortuguese(DateTime date) {
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    return dayNames[date.weekday % 7];
+  }
 
-    return weeklyTotals.entries.map((entry) {
-      final week = entry.key;
+  List<BarChartGroupData> _buildMonthlyBarGroups() {
+    final monthlyData = getMonthlyExpenses();
+    if (monthlyData.isEmpty) return [];
+    
+    
+    final maxDataValue = monthlyData.values.isEmpty
+        ? 100.0
+        : monthlyData.values.reduce((a, b) => a > b ? a : b);
+    
+    
+    final maxY = (maxDataValue * 1.2).clamp(100.0, double.infinity);
+
+    int index = 0;
+    return monthlyData.entries.map((entry) {
       final amount = entry.value;
 
       return BarChartGroupData(
-        x: week,
+        x: index++,
         barRods: [
           BarChartRodData(
             toY: amount,
@@ -146,7 +165,7 @@ class _HomepageState extends State<Homepage> {
             borderRadius: BorderRadius.circular(4),
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
-              toY: maxYValue,
+              toY: maxY, // Usar o maxY calculado
               color: Colors.grey[300]!,
             ),
           ),
@@ -155,9 +174,13 @@ class _HomepageState extends State<Homepage> {
     }).toList();
   }
 
-  int _getWeekOfMonth(DateTime date, DateTime firstDayOfMonth) {
-    final difference = date.difference(firstDayOfMonth).inDays;
-    return (difference / 7).floor() + 1;
+ 
+  double _calculateMaxY() {
+    final monthlyData = getMonthlyExpenses();
+    if (monthlyData.isEmpty) return 100.0;
+    
+    final maxValue = monthlyData.values.reduce((a, b) => a > b ? a : b);
+    return (maxValue * 1.2).clamp(100.0, double.infinity);
   }
 
   @override
@@ -186,18 +209,14 @@ class _HomepageState extends State<Homepage> {
       );
     }
 
-    final expenses = getFilteredExpenses();
+    final allExpenses = expenseData!.getAllExpenseList();
     final now = DateTime.now();
     final monthName = _fullMonthName(now.month);
     final year = now.year;
     final totalSpent = getTotalSpentCurrentMonth();
-    final barGroups = _buildWeeklyBarGroups();
-    final maxY = barGroups.isEmpty
-        ? 100.0
-        : barGroups
-                .map((g) => g.barRods[0].toY)
-                .reduce((value, element) => value > element ? value : element) *
-            1.2;
+    final barGroups = _buildMonthlyBarGroups();
+    final monthlyData = getMonthlyExpenses();
+    final maxY = _calculateMaxY(); 
 
     return Scaffold(
       appBar: AppBar(
@@ -271,9 +290,11 @@ class _HomepageState extends State<Homepage> {
                         prefixText: 'R\$ ',
                       ),
                       onChanged: (value) {
+                        final newLimit = double.tryParse(value) ?? 0.0;
                         setState(() {
-                          spendingLimit = double.tryParse(value) ?? 0.0;
+                          spendingLimit = newLimit;
                         });
+                        _saveSpendingLimit(newLimit); 
                       },
                     ),
                   ),
@@ -312,7 +333,7 @@ class _HomepageState extends State<Homepage> {
 
               const SizedBox(height: 16),
               const Text(
-                'Gastos por semana do mês:',
+                'Gastos por mês (últimos 6 meses):',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -321,6 +342,7 @@ class _HomepageState extends State<Homepage> {
                 child: BarChart(
                   BarChartData(
                     maxY: maxY,
+                    minY: 0, // Garantir que o mínimo seja 0
                     barGroups: barGroups,
                     titlesData: FlTitlesData(
                       bottomTitles: AxisTitles(
@@ -328,13 +350,17 @@ class _HomepageState extends State<Homepage> {
                           showTitles: true,
                           reservedSize: 32,
                           getTitlesWidget: (value, meta) {
-                            return SideTitleWidget(
-                              meta: meta,
-                              child: Text(
-                                '${value.toInt()}ª Sem',
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                            );
+                            final monthlyEntries = monthlyData.entries.toList();
+                            if (value.toInt() < monthlyEntries.length) {
+                              return SideTitleWidget(
+                                meta: meta,
+                                child: Text(
+                                  monthlyEntries[value.toInt()].key,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
                           },
                         ),
                       ),
@@ -342,7 +368,7 @@ class _HomepageState extends State<Homepage> {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 50,
-                          interval: (maxY / 5).clamp(50, double.infinity),
+                          interval: (maxY / 5).clamp(20, double.infinity), // Melhor intervalo
                           getTitlesWidget: (value, meta) {
                             return Text(
                               'R\$${value.toInt()}',
@@ -354,17 +380,31 @@ class _HomepageState extends State<Homepage> {
                       rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    gridData: FlGridData(show: true),
-                    borderData: FlBorderData(show: false),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false, // Remover linhas verticais
+                      horizontalInterval: (maxY / 5).clamp(20, double.infinity),
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: const Border(
+                        bottom: BorderSide(color: Colors.grey, width: 1),
+                        left: BorderSide(color: Colors.grey, width: 1),
+                      ),
+                    ),
                     barTouchData: BarTouchData(
                       enabled: true,
                       touchTooltipData: BarTouchTooltipData(
                         getTooltipColor: (group) => Colors.blueGrey,
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          return BarTooltipItem(
-                            '${group.x}ª Semana\nR\$ ${rod.toY.toStringAsFixed(2)}',
-                            const TextStyle(color: Colors.white, fontSize: 12),
-                          );
+                          final monthlyEntries = monthlyData.entries.toList();
+                          if (group.x < monthlyEntries.length) {
+                            return BarTooltipItem(
+                              '${monthlyEntries[group.x].key}\nR\$ ${rod.toY.toStringAsFixed(2)}',
+                              const TextStyle(color: Colors.white, fontSize: 12),
+                            );
+                          }
+                          return null;
                         },
                       ),
                     ),
@@ -373,77 +413,31 @@ class _HomepageState extends State<Homepage> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Text(
-                selectedDay.isEmpty 
-                    ? 'Filtrar por dia da semana:' 
-                    : 'Filtrado por: $selectedDay',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 50,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: weekDays.length,
-                  itemBuilder: (context, index) {
-                    final day = weekDays[index];
-                    final isSelected = day == selectedDay;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ChoiceChip(
-                        label: Text(day),
-                        selected: isSelected,
-                        selectedColor: Colors.deepPurple.shade300,
-                        onSelected: (_) {
-                          setState(() {
-                            selectedDay = isSelected ? '' : day;
-                          });
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 10),
-              Text(
-                selectedDay.isEmpty 
-                    ? 'Todas as despesas:' 
-                    : 'Despesas de $selectedDay:',
+                'Todas as compras (${allExpenses.length} itens):',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               
               SizedBox(
                 height: 300,
-                child: expenses.isEmpty
-                    ? Center(
+                child: allExpenses.isEmpty
+                    ? const Center(
                         child: Text(
-                          selectedDay.isEmpty 
-                              ? 'Nenhuma despesa encontrada.' 
-                              : 'Nenhuma despesa encontrada para $selectedDay.',
-                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          'Nenhuma compra encontrada.',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
                     : ListView.builder(
-                        itemCount: expenses.length,
+                        itemCount: allExpenses.length,
                         itemBuilder: (context, index) {
-                          final item = expenses[index];
+                          final item = allExpenses[index];
                           final formattedDate =
                               '${item.date.day.toString().padLeft(2, '0')}/'
                               '${item.date.month.toString().padLeft(2, '0')}/'
                               '${item.date.year}';
-                          final dayMapping = {
-                            'Sun': 'Dom',
-                            'Mon': 'Seg', 
-                            'Tue': 'Ter',
-                            'Wed': 'Qua',
-                            'Thu': 'Qui',
-                            'Fri': 'Sex',
-                            'Sat': 'Sab'
-                          };
-                          final dayName = dayMapping[expenseData!.getDayName(item.date)] ?? 'N/A';
+                          final dayName = _getDayNameInPortuguese(item.date);
 
                           return Card(
                             elevation: 2,

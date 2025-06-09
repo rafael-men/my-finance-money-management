@@ -55,7 +55,6 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
         throw Exception('Valor inválido');
       }
 
-  
       final newExpense = ExpenseItem(
         name: _nameController.text.trim(),
         amount: normalizedAmount,
@@ -64,10 +63,8 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
 
       print('Tentando salvar expense: ${newExpense.name} - R\$ ${newExpense.amount} - ${newExpense.date}');
       
-
       await widget.expenseData.addExpense(newExpense);
            
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -78,19 +75,29 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
         );
 
         
-        await Future.delayed(const Duration(milliseconds: 300));
-        Navigator.pop(context, true);
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+       
+        Navigator.of(context).pop(true);
       }
       
     } catch (e) {
       print('Erro ao salvar expense: $e');
       
       if (mounted) {
+        String errorMessage = 'Erro desconhecido';
+        
+        if (e.toString().contains('Cannot write, unknown type: ExpenseItem')) {
+          errorMessage = 'Erro: Adapter do ExpenseItem não registrado. Verifique se Hive.registerAdapter(ExpenseItemAdapter()) foi chamado no main.dart';
+        } else {
+          errorMessage = 'Erro ao salvar compra: ${e.toString()}';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao salvar compra: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -110,6 +117,10 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
         title: const Text('Criar Compra'),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -118,6 +129,17 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Text(
+                'Preencha os dados da compra:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.purple,
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -220,6 +242,16 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
                         'Salvar Compra',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                ),
+                child: const Text('Cancelar'),
               ),
             ],
           ),

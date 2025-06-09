@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 
+part 'expense_item.g.dart'; 
 
 @HiveType(typeId: 0)
 class ExpenseItem extends HiveObject {
@@ -17,4 +18,23 @@ class ExpenseItem extends HiveObject {
     required this.amount,
     required this.date,
   });
+
+  @override
+  String toString() {
+    return 'ExpenseItem(name: $name, amount: $amount, date: $date)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ExpenseItem &&
+        other.name == name &&
+        other.amount == amount &&
+        other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    return name.hashCode ^ amount.hashCode ^ date.hashCode;
+  }
 }

@@ -10,7 +10,7 @@ void main() async {
 
     await Hive.initFlutter();
     await Hive.openBox<ExpenseItem>('expensebox');
-    
+    Hive.registerAdapter(ExpenseItemAdapter());
     runApp(MyApp());
   } catch (e) {
     runApp(
