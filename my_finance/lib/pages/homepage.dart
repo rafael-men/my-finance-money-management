@@ -21,6 +21,17 @@ class _HomepageState extends State<Homepage> {
   bool isLoading = true;
   late Box settingsBox;
 
+
+  int? selectedWeekday; 
+
+  List<String> weekdayNames = [
+    'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'
+  ];
+
+  List<String> fullWeekdayNames = [
+    'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -33,10 +44,8 @@ class _HomepageState extends State<Homepage> {
       await expenseData!.init();
       await expenseData!.prepareData();
       
-     
       settingsBox = await Hive.openBox('settings');
       
-     
       spendingLimit = settingsBox.get('spendingLimit', defaultValue: 0.0);
       _limitController.text = spendingLimit > 0 ? spendingLimit.toString() : '';
       
@@ -66,7 +75,6 @@ class _HomepageState extends State<Homepage> {
     }
   }
 
-  
   Future<void> _saveSpendingLimit(double limit) async {
     await settingsBox.put('spendingLimit', limit);
   }
@@ -80,12 +88,75 @@ class _HomepageState extends State<Homepage> {
   }
 
   
+  List<ExpenseItem> getFilteredExpenses() {
+    if (expenseData == null) return [];
+    
+    if (selectedWeekday == null) {
+      return expenseData!.getAllExpenseList();
+    } else {
+      return expenseData!.getExpensesByWeekday(selectedWeekday!);
+    }
+  }
+
+ 
+  Widget _buildWeekdayFilter() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Filtrar por dia da semana:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+        
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: const Text('Todos'),
+                  selected: selectedWeekday == null,
+                  onSelected: (selected) {
+                    setState(() {
+                      selectedWeekday = null;
+                    });
+                  },
+                  selectedColor: Colors.deepPurple.shade100,
+                  checkmarkColor: Colors.deepPurple,
+                ),
+              ),
+          
+              ...List.generate(7, (index) {
+                final weekday = index + 1;
+                return Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(weekdayNames[index]),
+                    selected: selectedWeekday == weekday,
+                    onSelected: (selected) {
+                      setState(() {
+                        selectedWeekday = selected ? weekday : null;
+                      });
+                    },
+                    selectedColor: Colors.deepPurple.shade100,
+                    checkmarkColor: Colors.deepPurple,
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Map<String, double> getMonthlyExpenses() {
     if (expenseData == null) return {};
     
     final now = DateTime.now();
     final Map<String, double> monthlyTotals = {};
-    
     
     for (int i = 5; i >= 0; i--) {
       final monthDate = DateTime(now.year, now.month - i, 1);
@@ -93,7 +164,6 @@ class _HomepageState extends State<Homepage> {
       monthlyTotals[monthKey] = 0.0;
     }
     
-   
     for (var expense in expenseData!.getAllExpenseList()) {
       final monthKey = '${_shortMonthName(expense.date.month)}/${expense.date.year.toString().substring(2)}';
       
@@ -143,11 +213,9 @@ class _HomepageState extends State<Homepage> {
     final monthlyData = getMonthlyExpenses();
     if (monthlyData.isEmpty) return [];
     
-    
     final maxDataValue = monthlyData.values.isEmpty
         ? 100.0
         : monthlyData.values.reduce((a, b) => a > b ? a : b);
-    
     
     final maxY = (maxDataValue * 1.2).clamp(100.0, double.infinity);
 
@@ -165,7 +233,7 @@ class _HomepageState extends State<Homepage> {
             borderRadius: BorderRadius.circular(4),
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
-              toY: maxY, // Usar o maxY calculado
+              toY: maxY,
               color: Colors.grey[300]!,
             ),
           ),
@@ -174,7 +242,6 @@ class _HomepageState extends State<Homepage> {
     }).toList();
   }
 
- 
   double _calculateMaxY() {
     final monthlyData = getMonthlyExpenses();
     if (monthlyData.isEmpty) return 100.0;
@@ -210,13 +277,18 @@ class _HomepageState extends State<Homepage> {
     }
 
     final allExpenses = expenseData!.getAllExpenseList();
+    final filteredExpenses = getFilteredExpenses();
+    final filterText = selectedWeekday == null 
+        ? 'Todas as compras' 
+        : 'Compras de ${fullWeekdayNames[selectedWeekday! - 1]}';
+    
     final now = DateTime.now();
     final monthName = _fullMonthName(now.month);
     final year = now.year;
     final totalSpent = getTotalSpentCurrentMonth();
     final barGroups = _buildMonthlyBarGroups();
     final monthlyData = getMonthlyExpenses();
-    final maxY = _calculateMaxY(); 
+    final maxY = _calculateMaxY();
 
     return Scaffold(
       appBar: AppBar(
@@ -248,7 +320,7 @@ class _HomepageState extends State<Homepage> {
           ),
         ],
       ),
-      drawer: const Sidebar(), 
+      drawer: const Sidebar(),
       body: RefreshIndicator(
         onRefresh: _refreshData,
         child: Padding(
@@ -258,213 +330,218 @@ class _HomepageState extends State<Homepage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              const Text(
-                'Olá, seja bem-vindo!',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              
-              const SizedBox(height: 8),
-              Text('Mês atual: $monthName', style: const TextStyle(fontSize: 16)),
-              Text('Ano: $year', style: const TextStyle(fontSize: 16)),
-              
-              const SizedBox(height: 16),
-              Text(
-                'Total gasto no mês: R\$ ${totalSpent.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+                const Text(
+                  'Olá, seja bem-vindo!',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-              ),
+                
+                const SizedBox(height: 8),
+                Text('Mês atual: $monthName', style: const TextStyle(fontSize: 16)),
+                Text('Ano: $year', style: const TextStyle(fontSize: 16)),
+                
+                const SizedBox(height: 16),
+                Text(
+                  'Total gasto no mês: R\$ ${totalSpent.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple,
+                  ),
+                ),
 
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _limitController,
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Defina o limite de gastos',
-                        border: OutlineInputBorder(),
-                        prefixText: 'R\$ ',
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _limitController,
+                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Defina o limite de gastos',
+                          border: OutlineInputBorder(),
+                          prefixText: 'R\$ ',
+                        ),
+                        onChanged: (value) {
+                          final newLimit = double.tryParse(value) ?? 0.0;
+                          setState(() {
+                            spendingLimit = newLimit;
+                          });
+                          _saveSpendingLimit(newLimit);
+                        },
                       ),
-                      onChanged: (value) {
-                        final newLimit = double.tryParse(value) ?? 0.0;
-                        setState(() {
-                          spendingLimit = newLimit;
-                        });
-                        _saveSpendingLimit(newLimit); 
-                      },
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Limite: R\$ ${spendingLimit.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.redAccent,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Limite: R\$ ${spendingLimit.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.redAccent,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-              if (spendingLimit > 0 && totalSpent > spendingLimit)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red),
-                  ),
-                  child: const Text(
-                    'Você ultrapassou o limite de gastos!',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  ],
                 ),
 
-              const SizedBox(height: 16),
-              const Text(
-                'Gastos por mês (últimos 6 meses):',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 200,
-                child: BarChart(
-                  BarChartData(
-                    maxY: maxY,
-                    minY: 0, // Garantir que o mínimo seja 0
-                    barGroups: barGroups,
-                    titlesData: FlTitlesData(
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 32,
-                          getTitlesWidget: (value, meta) {
+                const SizedBox(height: 8),
+                if (spendingLimit > 0 && totalSpent > spendingLimit)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red),
+                    ),
+                    child: const Text(
+                      'Você ultrapassou o limite de gastos!',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+                const Text(
+                  'Gastos por mês (últimos 6 meses):',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 200,
+                  child: BarChart(
+                    BarChartData(
+                      maxY: maxY,
+                      minY: 0,
+                      barGroups: barGroups,
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 32,
+                            getTitlesWidget: (value, meta) {
+                              final monthlyEntries = monthlyData.entries.toList();
+                              if (value.toInt() < monthlyEntries.length) {
+                                return SideTitleWidget(
+                                  meta: meta,
+                                  child: Text(
+                                    monthlyEntries[value.toInt()].key,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 50,
+                            interval: (maxY / 5).clamp(20, double.infinity),
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                'R\$${value.toInt()}',
+                                style: const TextStyle(fontSize: 9),
+                              );
+                            },
+                          ),
+                        ),
+                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: (maxY / 5).clamp(20, double.infinity),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: const Border(
+                          bottom: BorderSide(color: Colors.grey, width: 1),
+                          left: BorderSide(color: Colors.grey, width: 1),
+                        ),
+                      ),
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (group) => Colors.blueGrey,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
                             final monthlyEntries = monthlyData.entries.toList();
-                            if (value.toInt() < monthlyEntries.length) {
-                              return SideTitleWidget(
-                                meta: meta,
-                                child: Text(
-                                  monthlyEntries[value.toInt()].key,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
+                            if (group.x < monthlyEntries.length) {
+                              return BarTooltipItem(
+                                '${monthlyEntries[group.x].key}\nR\$ ${rod.toY.toStringAsFixed(2)}',
+                                const TextStyle(color: Colors.white, fontSize: 12),
                               );
                             }
-                            return const SizedBox.shrink();
+                            return null;
                           },
                         ),
                       ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 50,
-                          interval: (maxY / 5).clamp(20, double.infinity), // Melhor intervalo
-                          getTitlesWidget: (value, meta) {
-                            return Text(
-                              'R\$${value.toInt()}',
-                              style: const TextStyle(fontSize: 9),
-                            );
-                          },
-                        ),
-                      ),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false, // Remover linhas verticais
-                      horizontalInterval: (maxY / 5).clamp(20, double.infinity),
-                    ),
-                    borderData: FlBorderData(
-                      show: true,
-                      border: const Border(
-                        bottom: BorderSide(color: Colors.grey, width: 1),
-                        left: BorderSide(color: Colors.grey, width: 1),
-                      ),
-                    ),
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (group) => Colors.blueGrey,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          final monthlyEntries = monthlyData.entries.toList();
-                          if (group.x < monthlyEntries.length) {
-                            return BarTooltipItem(
-                              '${monthlyEntries[group.x].key}\nR\$ ${rod.toY.toStringAsFixed(2)}',
-                              const TextStyle(color: Colors.white, fontSize: 12),
-                            );
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
+                    swapAnimationDuration: const Duration(milliseconds: 400),
                   ),
-                  swapAnimationDuration: const Duration(milliseconds: 400),
                 ),
-              ),
 
-              const SizedBox(height: 20),
-              Text(
-                'Todas as compras (${allExpenses.length} itens):',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              
-              SizedBox(
-                height: 300,
-                child: allExpenses.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Nenhuma compra encontrada.',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: allExpenses.length,
-                        itemBuilder: (context, index) {
-                          final item = allExpenses[index];
-                          final formattedDate =
-                              '${item.date.day.toString().padLeft(2, '0')}/'
-                              '${item.date.month.toString().padLeft(2, '0')}/'
-                              '${item.date.year}';
-                          final dayName = _getDayNameInPortuguese(item.date);
+                const SizedBox(height: 20),
+                _buildWeekdayFilter(),
+                const SizedBox(height: 16),
+                Text(
+                  '$filterText (${filteredExpenses.length} itens):',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                
+                SizedBox(
+                  height: 300,
+                  child: filteredExpenses.isEmpty
+                      ? Center(
+                          child: Text(
+                            selectedWeekday == null 
+                                ? 'Nenhuma compra encontrada.'
+                                : 'Nenhuma compra encontrada para ${fullWeekdayNames[selectedWeekday! - 1]}.',
+                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: filteredExpenses.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredExpenses[index];
+                            final formattedDate =
+                                '${item.date.day.toString().padLeft(2, '0')}/'
+                                '${item.date.month.toString().padLeft(2, '0')}/'
+                                '${item.date.year}';
+                            final dayName = _getDayNameInPortuguese(item.date);
 
-                          return Card(
-                            elevation: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            child: ListTile(
-                              title: Text(
-                                item.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text('$formattedDate - $dayName'),
-                              trailing: Text(
-                                'R\$ ${item.amount}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.deepPurple,
+                            return Card(
+                              elevation: 2,
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                title: Text(
+                                  item.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text('$formattedDate - $dayName'),
+                                trailing: Text(
+                                  'R\$ ${item.amount}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.deepPurple,
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
-      )
-    ));
+      ),
+    );
   }
 }

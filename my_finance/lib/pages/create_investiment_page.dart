@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import '../data/expense_data.dart';
-import '../models/expense_item.dart';
+import 'package:my_finance/models/investiment_item.dart';
+import '../main.dart';
 
-class CreateExpensePage extends StatefulWidget {
-  final ExpenseData expenseData;
-
-  const CreateExpensePage({super.key, required this.expenseData});
+class CreateInvestmentPage extends StatefulWidget {
+  const CreateInvestmentPage({super.key});
 
   @override
-  State<CreateExpensePage> createState() => _CreateExpensePageState();
+  State<CreateInvestmentPage> createState() => _CreateInvestmentPageState();
 }
 
-class _CreateExpensePageState extends State<CreateExpensePage> {
+class _CreateInvestmentPageState extends State<CreateInvestmentPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _brokerController = TextEditingController();
+  String _selectedType = 'Ações';
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
 
@@ -22,6 +22,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
   void dispose() {
     _nameController.dispose();
     _amountController.dispose();
+    _brokerController.dispose();
     super.dispose();
   }
 
@@ -30,7 +31,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
     );
     if (date != null) {
       setState(() {
@@ -39,7 +40,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
     }
   }
 
-  Future<void> _saveExpense() async {
+  Future<void> _saveInvestment() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -48,53 +49,39 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
 
     try {
       final normalizedAmount = _amountController.text.replaceAll(',', '.');
-    
       final parsedAmount = double.tryParse(normalizedAmount);
+      
       if (parsedAmount == null || parsedAmount <= 0) {
         throw Exception('Valor inválido');
       }
 
-      final newExpense = ExpenseItem(
+      final newInvestment = InvestmentItem(
         name: _nameController.text.trim(),
         amount: normalizedAmount,
         date: _selectedDate,
+        type: _selectedType,
+        broker: _brokerController.text.trim(),
       );
 
-      print('Tentando salvar expense: ${newExpense.name} - R\$ ${newExpense.amount} - ${newExpense.date}');
+      await investmentBox.add(newInvestment);
       
-      await widget.expenseData.addExpense(newExpense);
-           
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Compra salva com sucesso!'),
+            content: Text('Investimento salvo com sucesso!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
 
-        
         await Future.delayed(const Duration(milliseconds: 500));
-        
-       
         Navigator.of(context).pop(true);
       }
-      
     } catch (e) {
-      print('Erro ao salvar expense: $e');
-      
       if (mounted) {
-        String errorMessage = 'Erro desconhecido';
-        
-        if (e.toString().contains('Cannot write, unknown type: ExpenseItem')) {
-          errorMessage = 'Erro: Adapter do ExpenseItem não registrado. Verifique se Hive.registerAdapter(ExpenseItemAdapter()) foi chamado no main.dart';
-        } else {
-          errorMessage = 'Erro ao salvar compra: ${e.toString()}';
-        }
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('Erro ao salvar investimento: ${e.toString()}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
@@ -113,7 +100,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Criar Compra'),
+        title: const Text('Novo Investimento'),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -129,7 +116,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Preencha os dados da compra:',
+                'Preencha os dados do investimento:',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -142,13 +129,13 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Nome da compra',
+                  labelText: 'Nome da Instituição',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.shopping_cart),
+                  prefixIcon: Icon(Icons.account_balance),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Informe o nome da compra';
+                    return 'Informe o nome da instituição';
                   }
                   if (value.trim().length < 2) {
                     return 'Nome deve ter pelo menos 2 caracteres';
@@ -163,14 +150,13 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
               TextFormField(
                 controller: _amountController,
                 decoration: const InputDecoration(
-                  labelText: 'Valor',
+                  labelText: 'Valor Investido',
                   prefixText: 'R\$ ',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.attach_money),
                   helperText: 'Use vírgula ou ponto para decimais (ex: 10,50)',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Informe o valor';
@@ -187,12 +173,48 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
                     return 'Valor deve ser maior que zero';
                   }
                   
-                  if (val > 999999) {
-                    return 'Valor muito alto';
-                  }
-                  
                   return null;
                 },
+                textInputAction: TextInputAction.next,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de Investimento',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.trending_up),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Ações', child: Text('Ações')),
+                  DropdownMenuItem(value: 'FIIs', child: Text('FIIs')),
+                  DropdownMenuItem(value: 'Tesouro Direto', child: Text('Tesouro Direto')),
+                  DropdownMenuItem(value: 'CDB/CDI', child: Text('CDB/CDI')),
+                  DropdownMenuItem(value: 'Renda Fixa', child: Text('Renda Fixa')),
+                  DropdownMenuItem(value: 'Bolsa Bovespa', child: Text('Bolsa Bovespa')),
+                  DropdownMenuItem(value: 'Bolsa Nasdaq', child: Text('Bolsa Nasdaq')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedType = value;
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _brokerController,
+                decoration: const InputDecoration(
+                  labelText: 'Corretora (opcional)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                ),
+                textInputAction: TextInputAction.next,
               ),
               
               const SizedBox(height: 16),
@@ -201,7 +223,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
                 elevation: 2,
                 child: ListTile(
                   leading: const Icon(Icons.calendar_today, color: Colors.purple),
-                  title: const Text('Data da compra'),
+                  title: const Text('Data do Investimento'),
                   subtitle: Text(
                     '${_selectedDate.day.toString().padLeft(2, '0')}/'
                     '${_selectedDate.month.toString().padLeft(2, '0')}/'
@@ -218,7 +240,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
               const SizedBox(height: 32),
               
               ElevatedButton(
-                onPressed: _isLoading ? null : _saveExpense,
+                onPressed: _isLoading ? null : _saveInvestment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
                   foregroundColor: Colors.white,
@@ -238,7 +260,7 @@ class _CreateExpensePageState extends State<CreateExpensePage> {
                         ),
                       )
                     : const Text(
-                        'Salvar Compra',
+                        'Salvar Investimento',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
               ),

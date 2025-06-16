@@ -56,4 +56,34 @@ class ExpenseData extends ChangeNotifier {
     notifyListeners();
     print('refreshData chamado manualmente');
   }
+
+  List<ExpenseItem> getExpensesByWeekday(int weekday) {
+  return _expenseBox.values.where((expense) {
+    return expense.date.weekday == weekday;
+  }).toList();
+}
+
+Map<int, List<ExpenseItem>> getExpensesGroupedByWeekday() {
+  final Map<int, List<ExpenseItem>> groupedExpenses = {};
+  
+  for (int i = 1; i <= 7; i++) {
+    groupedExpenses[i] = [];
+  }
+  
+  
+  for (var expense in _expenseBox.values) {
+    final weekday = expense.date.weekday;
+    groupedExpenses[weekday]!.add(expense);
+  }
+  
+  return groupedExpenses;
+}
+
+double getTotalByWeekday(int weekday) {
+  final expenses = getExpensesByWeekday(weekday);
+  return expenses.fold<double>(
+    0, 
+    (total, expense) => total + (double.tryParse(expense.amount) ?? 0)
+  );
+}
 }
