@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:my_finance/widgets/sidebar.dart';
 
 import '../data/expense_data.dart';
 import '../models/expense_item.dart';
-import '../widgets/sidebar.dart'; 
 import '../pages/create_expense_page.dart';
 
 class Homepage extends StatefulWidget {
@@ -21,8 +21,7 @@ class _HomepageState extends State<Homepage> {
   bool isLoading = true;
   late Box settingsBox;
 
-
-  int? selectedWeekday; 
+  int? selectedWeekday;
 
   List<String> weekdayNames = [
     'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'
@@ -82,12 +81,11 @@ class _HomepageState extends State<Homepage> {
   @override
   void dispose() {
     _limitController.dispose();
-    expenseData?.close();
+    expenseData?.close(); 
     settingsBox.close();
     super.dispose();
   }
 
-  
   List<ExpenseItem> getFilteredExpenses() {
     if (expenseData == null) return [];
     
@@ -98,7 +96,34 @@ class _HomepageState extends State<Homepage> {
     }
   }
 
- 
+
+  Future<void> _deleteExpenseWithConfirmation(BuildContext context, ExpenseItem expense) async {
+    final bool confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar exclusão'),
+        content: Text('Tem certeza que deseja excluir a compra "${expense.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false), // Cancela a exclusão
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true), // Confirma a exclusão
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm) {
+      await expenseData!.deleteExpense(expense);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Compra "${expense.name}" excluída')),
+      );
+    }
+  }
+
   Widget _buildWeekdayFilter() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +137,7 @@ class _HomepageState extends State<Homepage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-        
+          
               Container(
                 margin: const EdgeInsets.only(right: 8),
                 child: FilterChip(
@@ -169,7 +194,7 @@ class _HomepageState extends State<Homepage> {
       
       if (monthlyTotals.containsKey(monthKey)) {
         monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + 
-                                 (double.tryParse(expense.amount) ?? 0);
+                                  (double.tryParse(expense.amount) ?? 0);
       }
     }
     
@@ -278,8 +303,8 @@ class _HomepageState extends State<Homepage> {
 
     final allExpenses = expenseData!.getAllExpenseList();
     final filteredExpenses = getFilteredExpenses();
-    final filterText = selectedWeekday == null 
-        ? 'Todas as compras' 
+    final filterText = selectedWeekday == null
+        ? 'Todas as compras'
         : 'Compras de ${fullWeekdayNames[selectedWeekday! - 1]}';
     
     final now = DateTime.now();
@@ -294,6 +319,7 @@ class _HomepageState extends State<Homepage> {
       appBar: AppBar(
         title: const Text('Minhas Finanças'),
         backgroundColor: Colors.purple,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -494,12 +520,13 @@ class _HomepageState extends State<Homepage> {
                 ),
                 const SizedBox(height: 8),
                 
+                // Aqui é onde aplicamos a mudança para o botão de exclusão
                 SizedBox(
                   height: 300,
                   child: filteredExpenses.isEmpty
                       ? Center(
                           child: Text(
-                            selectedWeekday == null 
+                            selectedWeekday == null
                                 ? 'Nenhuma compra encontrada.'
                                 : 'Nenhuma compra encontrada para ${fullWeekdayNames[selectedWeekday! - 1]}.',
                             style: const TextStyle(fontSize: 16, color: Colors.grey),
@@ -524,13 +551,24 @@ class _HomepageState extends State<Homepage> {
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Text('$formattedDate - $dayName'),
-                                trailing: Text(
-                                  'R\$ ${item.amount}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: Colors.deepPurple,
-                                  ),
+                                // Adicionando o botão de exclusão
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min, // Ocupa o mínimo de espaço
+                                  children: [
+                                    Text(
+                                      'R\$ ${item.amount}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.deepPurple,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8), // Espaçamento entre o valor e o botão
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () => _deleteExpenseWithConfirmation(context, item),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

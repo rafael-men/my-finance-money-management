@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:my_finance/data/travel_data.dart';
 import 'package:my_finance/models/investiment_item.dart';
-import 'package:my_finance/pages/investiments.dart'; // Corrigi o nome do arquivo para 'investments_page.dart'
+import 'package:my_finance/pages/investiments.dart';
+import 'package:my_finance/pages/trips_page.dart'; 
 import './pages/homepage.dart';
 import './models/expense_item.dart';
- // Corrigi o nome do arquivo para 'investment_item.dart'
+import './models/trip_item.dart';
+import './models/travel_expense.dart';
 
-// Variáveis globais para os boxes (solução simples e eficaz)
 late Box<ExpenseItem> expenseBox;
 late Box<InvestmentItem> investmentBox;
+late Box<TripItem> tripBox;
+late Box<TravelExpense> travelBox;
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,10 +22,15 @@ void main() async {
     await Hive.initFlutter();
     Hive.registerAdapter(ExpenseItemAdapter());
     Hive.registerAdapter(InvestmentItemAdapter());
+    Hive.registerAdapter(TripItemAdapter()); 
+    Hive.registerAdapter(TravelExpenseAdapter()); 
     
-    // Inicializa os boxes e armazena nas variáveis globais
+
     expenseBox = await Hive.openBox<ExpenseItem>('expensebox');
     investmentBox = await Hive.openBox<InvestmentItem>('investmentbox');
+    tripBox = await Hive.openBox<TripItem>('trips'); 
+    travelBox = await Hive.openBox<TravelExpense>('travel_expenses'); 
+    await TravelData().init();
     
     runApp(const MyApp());
   } catch (e) {
@@ -43,7 +53,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const Homepage(),
       routes: {
-        '/investments': (context) => const InvestmentsPage(), // Removi o parâmetro investmentBox
+        '/investments': (context) => const InvestmentsPage(), 
+        '/trips': (context) => const TripsPage(),
       },
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_finance/pages/homepage.dart';
+import 'package:my_finance/pages/trips_page.dart';
 
 
 
@@ -36,18 +37,16 @@ class Sidebar extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/investments');
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.payments_outlined ),
-            title: const Text('Salário'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add_shopping_cart ),
-            title: const Text('A Comprar'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.airplane_ticket_outlined ),
+           ListTile(
+            leading: const Icon(Icons.airplane_ticket_outlined),
             title: const Text('Viagens'),
-          ),
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TripsPage()),
+              );
+            }
+           )
         ],
       ),
     );

@@ -89,9 +89,6 @@ class InvestmentData {
     return totals;
   }
 
-  Future<void> updateInvestment(int key, InvestmentItem updatedInvestment) async {
-    await _investmentBox.put(key, updatedInvestment);
-  }
 
   Future<void> deleteInvestment(int key) async {
     await _investmentBox.delete(key);
