@@ -41,7 +41,16 @@ option chrome 2
 
 ## 📥 Instalação em Android para uso
 
-- Navegue até o diretório 
+- Dê o comando abaixo para criar o apk:
+  
+```bash
+flutter build apk --release
+```
+- O Apk estará abaixo, após isso é só instalar em seu dispositivo móvel android.
+  
+<seu_projeto>/build/app/outputs/flutter-apk/app-release.apk
+
+- Para que a instalação dê certo, desative a opção no dispositivo de não confiar em fontes externas nas configurações.
 
 ## 🔄 Como Contribuir
 
