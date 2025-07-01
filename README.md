@@ -39,6 +39,10 @@ flutter run
 option chrome 2
 ```
 
+## 📥 Instalação em Android para uso
+
+- Navegue até o diretório 
+
 ## 🔄 Como Contribuir
 
 Faça um fork do projeto.
